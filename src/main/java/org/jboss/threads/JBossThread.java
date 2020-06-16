@@ -149,18 +149,27 @@ public class JBossThread extends Thread {
         if (isInterrupted()) return;
         final AtomicInteger stateRef = this.stateRef;
         int oldVal, newVal;
-        do {
+        for (;;) {
             oldVal = stateRef.get();
-            if (oldVal == STATE_INTERRUPT_PENDING || oldVal == STATE_INTERRUPT_IN_PROGRESS) {
+            if (oldVal == STATE_INTERRUPT_PENDING) {
                 // already set
-                Messages.msg.infof("Interrupting thread \"%s\" (already interrupted)", this);
+                Messages.msg.tracef("Interrupting thread \"%s\" (already interrupted)", this);
                 return;
-            } else if (oldVal == STATE_INTERRUPT_DEFERRED) {
-                newVal = STATE_INTERRUPT_PENDING;
+            } else if (oldVal == STATE_INTERRUPT_IN_PROGRESS) {
+                // wait for interruption on other thread to be completed
+                JDKSpecific.onSpinWait();
+                continue;
             } else {
-                newVal = STATE_INTERRUPT_IN_PROGRESS;
+                if (oldVal == STATE_INTERRUPT_DEFERRED) {
+                    newVal = STATE_INTERRUPT_PENDING;
+                } else {
+                    newVal = STATE_INTERRUPT_IN_PROGRESS;
+                }
             }
-        } while (! stateRef.compareAndSet(oldVal, newVal));
+            if (stateRef.compareAndSet(oldVal, newVal)) {
+                break;
+            }
+        }
         if (newVal == STATE_INTERRUPT_IN_PROGRESS) try {
             doInterrupt();
         } finally {
