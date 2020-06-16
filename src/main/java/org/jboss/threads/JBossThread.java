@@ -18,6 +18,7 @@
 
 package org.jboss.threads;
 
+import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
 import java.util.concurrent.Callable;
@@ -25,6 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
 import org.wildfly.common.Assert;
+import org.wildfly.common.cpu.ProcessorInfo;
 import org.wildfly.common.function.ExceptionBiConsumer;
 import org.wildfly.common.function.ExceptionBiFunction;
 import org.wildfly.common.function.ExceptionConsumer;
@@ -43,6 +45,12 @@ public class JBossThread extends Thread {
     static {
         Version.getVersionString();
     }
+
+    private static final int MAX_INTERRUPT_SPINS = AccessController.doPrivileged(new PrivilegedAction<Integer>() {
+        public Integer run() {
+            return Integer.valueOf(Integer.parseInt(System.getProperty("jboss.threads.interrupt.spins", ProcessorInfo.availableProcessors() == 0 ? "0" : "128")));
+        }
+    }).intValue();
 
     private volatile InterruptHandler interruptHandler;
     private ThreadNameInfo threadNameInfo;
@@ -149,6 +157,7 @@ public class JBossThread extends Thread {
         if (isInterrupted()) return;
         final AtomicInteger stateRef = this.stateRef;
         int oldVal, newVal;
+        int spins = 0;
         for (;;) {
             oldVal = stateRef.get();
             if (oldVal == STATE_INTERRUPT_PENDING) {
@@ -157,7 +166,12 @@ public class JBossThread extends Thread {
                 return;
             } else if (oldVal == STATE_INTERRUPT_IN_PROGRESS) {
                 // wait for interruption on other thread to be completed
-                JDKSpecific.onSpinWait();
+                if (spins < MAX_INTERRUPT_SPINS) {
+                    JDKSpecific.onSpinWait();
+                    spins++;
+                } else {
+                    Thread.yield();
+                }
                 continue;
             } else {
                 if (oldVal == STATE_INTERRUPT_DEFERRED) {
