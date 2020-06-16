@@ -142,6 +142,7 @@ public class JBossThread extends Thread {
      * handler is called from the <em>calling</em> thread, not the thread being interrupted.
      */
     public void interrupt() {
+        Messages.msg.info("...................... Interrupt" + this + " ----- this.stateRef= "+ this.stateRef);
         final boolean differentThread = Thread.currentThread() != this;
         if (differentThread) checkAccess();
         // fast check
@@ -152,7 +153,7 @@ public class JBossThread extends Thread {
             oldVal = stateRef.get();
             if (oldVal == STATE_INTERRUPT_PENDING || oldVal == STATE_INTERRUPT_IN_PROGRESS) {
                 // already set
-                Messages.msg.tracef("Interrupting thread \"%s\" (already interrupted)", this);
+                Messages.msg.infof("Interrupting thread \"%s\" (already interrupted)", this);
                 return;
             } else if (oldVal == STATE_INTERRUPT_DEFERRED) {
                 newVal = STATE_INTERRUPT_PENDING;
@@ -171,13 +172,13 @@ public class JBossThread extends Thread {
                 LockSupport.unpark(this);
             }
         } else {
-            Messages.intMsg.tracef("Interrupting thread \"%s\" (deferred)", this);
+            Messages.intMsg.infof("Interrupting thread \"%s\" (deferred)", this);
         }
     }
 
     private void doInterrupt() {
         if (isInterrupted()) return;
-        Messages.msg.tracef("Interrupting thread \"%s\"", this);
+        Messages.msg.infof("Interrupting thread \"%s\"", this);
         try {
             super.interrupt();
         } finally {
@@ -480,11 +481,11 @@ public class JBossThread extends Thread {
      * Execute the thread's {@code Runnable}.  Logs a trace message at the start and end of execution.
      */
     public void run() {
-        Messages.msg.tracef("Thread \"%s\" starting execution", this);
+        Messages.msg.infof("Thread \"%s\" starting execution", this);
         try {
             super.run();
         } finally {
-            Messages.msg.tracef("Thread \"%s\" exiting", this);
+            Messages.msg.infof("Thread \"%s\" exiting", this);
         }
     }
 
@@ -505,7 +506,7 @@ public class JBossThread extends Thread {
      */
     public void start() {
         super.start();
-        Messages.msg.tracef("Started thread \"%s\"", this);
+        Messages.msg.infof("Started thread \"%s\"", this);
     }
 
     /**
@@ -515,7 +516,7 @@ public class JBossThread extends Thread {
      */
     public void setUncaughtExceptionHandler(final UncaughtExceptionHandler eh) {
         super.setUncaughtExceptionHandler(eh);
-        Messages.msg.tracef("Changed uncaught exception handler for \"%s\" to %s", this, eh);
+        Messages.msg.infof("Changed uncaught exception handler for \"%s\" to %s", this, eh);
     }
 
     /**
